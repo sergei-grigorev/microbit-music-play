@@ -1,142 +1,59 @@
-// #![deny(unsafe_code)]
-#![no_main]
 #![no_std]
+#![no_main]
 
 mod controls;
 mod data;
 mod display;
+mod numbers;
 
-use controls::clear_direction;
-use cortex_m_rt::entry;
-use data::Direction;
-use display::{clear_display, display_image};
-use microbit::board::Board;
-use microbit::display::nonblocking::BitImage;
-use microbit::hal::Timer;
-use panic_rtt_target as _;
-use rtt_target::{rprintln, rtt_init_print};
+use controls::get_direction;
+use defmt::{info, warn};
+use display::DisplayPins;
+use embassy_executor::Spawner;
+use embassy_futures::select::{select, Either};
+use embassy_nrf::gpio::{Input, Level, Output, OutputDrive, Pin, Pull};
+use embassy_time::Timer;
+use {defmt_rtt as _, panic_probe as _};
 
-const MAX_X: usize = 4;
-const MAX_Y: usize = 4;
-const DURATION: u32 = 200;
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    let p = embassy_nrf::init(Default::default());
 
-const LED1: [[u8; 5]; 5] = [
-    [0, 0, 1, 0, 0],
-    [0, 1, 1, 0, 0],
-    [0, 0, 1, 0, 0],
-    [0, 0, 1, 0, 0],
-    [0, 0, 1, 0, 0],
-];
+    // display
+    let row1 = p.P0_21.degrade();
+    let row2 = p.P0_22.degrade();
+    let row3 = p.P0_15.degrade();
+    let row4 = p.P0_24.degrade();
+    let row5 = p.P0_19.degrade();
+    let col1 = p.P0_28.degrade();
+    let col2 = p.P0_11.degrade();
+    let col3 = p.P0_31.degrade();
+    let col4 = p.P1_05.degrade();
+    let col5 = p.P0_30.degrade();
 
-const LED2: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 1, 1, 1, 0],
-];
+    // initialize display pins
+    let mut display = DisplayPins::new(col1, col2, col3, col4, col5, row1, row2, row3, row4, row5);
 
-const LED3: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-];
+    // available buttons
+    let mut button_a = Input::new(p.P0_14, Pull::Up);
+    let mut button_b = Input::new(p.P0_23, Pull::Up);
 
-const LED4: [[u8; 5]; 5] = [
-    [0, 1, 0, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 0, 1, 1, 0],
-];
-
-const LED5: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 0, 0],
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-];
-
-const LED6: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 0, 0],
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-];
-
-const LED7: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 1, 0, 0, 0],
-];
-
-const LED8: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-];
-
-const LED9: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 0, 1, 1, 0],
-    [0, 0, 0, 1, 0],
-    [0, 0, 0, 1, 0],
-];
-
-const LED0: [[u8; 5]; 5] = [
-    [0, 1, 1, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 0, 1, 0],
-    [0, 1, 1, 1, 0],
-];
-
-#[entry]
-fn main() -> ! {
-    rtt_init_print!();
-
-    let board = Board::take().unwrap();
-    let mut timer = Timer::new(board.TIMER0).into_periodic();
-    // let mut rng = Rng::new(board.RNG);
-
-    controls::init_buttons(board.GPIOTE, board.buttons);
-    display::init_display(board.TIMER1, board.display_pins);
-
-    let all = [LED0, LED1, LED2, LED3, LED4, LED5, LED6, LED7, LED8, LED9];
     let mut current: usize = 0;
-
     loop {
-        if let Some(leds) = all.get(current) {
-            let image = BitImage::new(&leds);
-            display_image(&image);
-        } else {
-            rprintln!("Element is not found, replace with the first one");
-            current = 0;
-        }
+        let actions = select(
+            get_direction(&mut button_a, &mut button_b),
+            display.render(current),
+        )
+        .await;
 
-        timer.delay(100_000u32);
-
-        clear_display();
-        let direction = controls::get_direction();
-        if direction != Direction::None {
-            clear_direction();
-
+        if let Either::First(direction) = actions {
             match direction {
-                Direction::Left if current > 0 => current -= 1,
-                Direction::Right if current < (all.len() - 1) => current += 1,
-                _ => {}
+                data::Direction::Left if current > 0 => current -= 1,
+                data::Direction::Right if current < 9 => current += 1,
+                _ => warn!("Invalid direction"),
             }
 
-            rprintln!("direction: {:?}, new current: {}", direction, current);
+            info!("Direction: {:?}, new value: {}", direction, current);
         }
     }
 }
