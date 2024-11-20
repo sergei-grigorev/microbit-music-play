@@ -1,10 +1,10 @@
-use data::Direction;
 use defmt::info;
+pub(crate) use direction::Direction;
 use embassy_futures::select::{select, Either};
 use embassy_nrf::gpio::{Flex, Input, Pull};
 use embassy_time::Timer;
 
-use crate::data;
+mod direction;
 
 /// Minimum charging time in microseconds to regard as
 /// "touched".

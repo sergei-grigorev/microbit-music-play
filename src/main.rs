@@ -2,13 +2,13 @@
 #![no_main]
 
 mod controls;
-mod data;
 mod display;
 mod speaker;
 
 use core::sync::atomic::Ordering;
 
 use controls::{get_direction, get_touch};
+use controls::Direction;
 use defmt::{info, warn};
 use display::{Columns, DisplayPins, Rows};
 use embassy_executor::Spawner;
@@ -78,8 +78,8 @@ async fn main(spawner: Spawner) {
 
         if let Either::First(direction) = actions {
             match direction {
-                data::Direction::Left if current > 0 => current -= 1,
-                data::Direction::Right if current < 9 => current += 1,
+                Direction::Left if current > 0 => current -= 1,
+                Direction::Right if current < 9 => current += 1,
                 _ => warn!("Invalid direction"),
             }
 
