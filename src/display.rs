@@ -1,49 +1,55 @@
 use embassy_nrf::gpio::{AnyPin, Flex, Level, Output, OutputDrive, Pull};
 use embassy_time::Timer;
 
-use crate::numbers::*;
+mod numbers;
+use numbers::*;
 
 pub struct DisplayPins<'a> {
     cols: [Flex<'a>; 5],
     rows: [Output<'a>; 5],
 }
 
+pub struct Columns {
+    pub col1: AnyPin,
+    pub col2: AnyPin,
+    pub col3: AnyPin,
+    pub col4: AnyPin,
+    pub col5: AnyPin,
+}
+
+pub struct Rows {
+    pub row1: AnyPin,
+    pub row2: AnyPin,
+    pub row3: AnyPin,
+    pub row4: AnyPin,
+    pub row5: AnyPin,
+}
+
 impl DisplayPins<'_> {
-    pub fn new<'a>(
-        col1: AnyPin,
-        col2: AnyPin,
-        col3: AnyPin,
-        col4: AnyPin,
-        col5: AnyPin,
-        row1: AnyPin,
-        row2: AnyPin,
-        row3: AnyPin,
-        row4: AnyPin,
-        row5: AnyPin,
-    ) -> DisplayPins<'a> {
+    pub fn new<'a>(cols: Columns, rows: Rows) -> DisplayPins<'a> {
         let mut cols = [
-            Flex::new(col1),
-            Flex::new(col2),
-            Flex::new(col3),
-            Flex::new(col4),
-            Flex::new(col5),
+            Flex::new(cols.col1),
+            Flex::new(cols.col2),
+            Flex::new(cols.col3),
+            Flex::new(cols.col4),
+            Flex::new(cols.col5),
         ];
 
         cols.iter_mut()
             .for_each(|c| c.set_as_input_output(Pull::Up, OutputDrive::Standard0Disconnect1));
 
         let rows = [
-            Output::new(row1, Level::Low, OutputDrive::Standard),
-            Output::new(row2, Level::Low, OutputDrive::Standard),
-            Output::new(row3, Level::Low, OutputDrive::Standard),
-            Output::new(row4, Level::Low, OutputDrive::Standard),
-            Output::new(row5, Level::Low, OutputDrive::Standard),
+            Output::new(rows.row1, Level::Low, OutputDrive::Standard),
+            Output::new(rows.row2, Level::Low, OutputDrive::Standard),
+            Output::new(rows.row3, Level::Low, OutputDrive::Standard),
+            Output::new(rows.row4, Level::Low, OutputDrive::Standard),
+            Output::new(rows.row5, Level::Low, OutputDrive::Standard),
         ];
 
         DisplayPins { cols, rows }
     }
 
-    pub async fn render(&mut self, number: usize) {
+    pub async fn render(&mut self, number: u32) {
         let frame = match number {
             0 => LED0,
             1 => LED1,
