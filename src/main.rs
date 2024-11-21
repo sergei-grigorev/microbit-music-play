@@ -7,8 +7,8 @@ mod speaker;
 
 use core::sync::atomic::Ordering;
 
-use controls::{get_direction, get_touch};
 use controls::Direction;
+use controls::{get_direction, get_touch};
 use defmt::{info, warn};
 use display::{Columns, DisplayPins, Rows};
 use embassy_executor::Spawner;
